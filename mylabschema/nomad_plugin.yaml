@@ -1,0 +1,4 @@
+plugin_type: schema
+name: My Lab Schema
+description: |
+  This schema is used for recording band gap measurements done in my lab.
