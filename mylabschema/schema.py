@@ -44,41 +44,37 @@ class MySample(Sample):
         if self.x_ray_fluorescence_file:
             with archive.m_context.raw_file(self.x_ray_fluorescence_file) as f:
                 data = np.loadtxt(f, delimiter=',', dtype=str)
-                material = m_add(archive, "results.material")
-                material.elements = self.extract_elements(data)
+                material = m_get_section(archive, "results.material")
+                material.elements = data[:, 0]
 
         # Read in the the UV-Vis measurement, extract band gap and save in common metainfo
         if self.uv_vis_spectrum_file:
             with archive.m_context.raw_file(self.uv_vis_spectrum_file) as f:
                 data = np.loadtxt(f, delimiter=',')
-                band_gap_section = m_add(archive, "results.properties.electronic.band_structure_electronic.band_gap")
-                band_gap_section.value = self.extract_band_gap(data)
-                archive.results.properties.available_properties = ['electronic.band_structure_electronic.band_gap']
+                wavelength = data[:, 0]
+                absorbance = data[:, 1]
 
-    def extract_band_gap(self, data: np.ndarray) -> ureg.Quantity:
-        '''Extracts a band gap value from a UV-vis spectra.'''
-        wavelength = data[:, 0]
-        absorbance = data[:, 1]
+                # Smoothen data, calculate gradient
+                absorbance_smooth = savgol_filter(absorbance, 25, 3)
+                absorbance_gradient = -np.gradient(absorbance_smooth)
 
-        # Smoothen data, calculate gradient
-        absorbance_smooth = savgol_filter(absorbance, 25, 3)
-        absorbance_gradient = -np.gradient(absorbance_smooth)
+                # Find peak in gradient
+                peaks, _ = find_peaks(absorbance_gradient, height=0.015)
+                assert len(peaks) == 1
+                peak_wavelength = wavelength[peaks[0]]
 
-        # Find peak in gradient
-        peaks, _ = find_peaks(absorbance_gradient, height=0.015)
-        assert len(peaks) == 1
-        peak_wavelength = wavelength[peaks[0]]
+                # Calculate band gap energy from peak position using eV = h * c / lambda
+                band_gap_energy = (ureg.speed_of_light * ureg.planck_constant) / (peak_wavelength * ureg('nanometer'))
 
-        # Calculate band gap energy from peak position using eV = h * c / lambda
-        band_gap_energy = (ureg.speed_of_light * ureg.planck_constant) / (peak_wavelength * ureg('nanometer'))
-        return band_gap_energy.to(ureg.eV)
-
-    def extract_elements(self, data: np.ndarray) -> List[str]:
-        '''Extracts a list of chemical elements from the X-ray fluorescence file.'''
-        return data[:, 0]
+                band_gap_section = m_get_section(archive, "results.properties.electronic.band_structure_electronic.band_gap")
+                band_gap_section.value = band_gap_energy
     
 
-def m_add(root, path):
+def m_get_section(root, path):
+    '''Given a root section and a path, looks if a unique section can be found
+    under that path and returns it. Will create the sections along the path if
+    no instances are found.
+    '''
     parts = path.split(".")
     for part in parts:
         child = getattr(root, part)
