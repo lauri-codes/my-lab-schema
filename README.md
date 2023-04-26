@@ -14,9 +14,16 @@ pre-filled by the schema to minimize the need for typing.
 ## Registration
 Add the following into the nomad.yaml configuration of your NOMAD Oasis:
 
+```yaml
+plugins:
+  options:
+    schemas/mylabschema:
+      python_package: mylabschema
+```
+
+
 ## Usage
 - Create new upload
 - Create new entry, select `MySample` as the schema
-- Write human-readable sample ID ELN form and on the physical sample
 - Upload measurement data (UV-Vis + X-ray fluorescence)
 - Save

@@ -1,6 +1,5 @@
 import uuid
 import datetime
-from typing import List
 
 import numpy as np
 from scipy.signal import find_peaks, savgol_filter
